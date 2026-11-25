@@ -8,7 +8,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 async function getSupabaseProperties(): Promise<Property[]> {
   if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error("Supabase public API config missing");
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/properties?select=*&order=created_at.desc`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/properties?select=*&order=id.desc`, {
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
   });
   if (!res.ok) throw new Error(`Supabase properties fetch failed (${res.status})`);
@@ -22,12 +22,8 @@ async function getSupabaseProperties(): Promise<Property[]> {
     price: row.price == null ? null : Number(row.price),
     imageUrl: row.image_url ?? row.images?.[0] ?? "",
     images: Array.isArray(row.images) ? row.images : [],
-    specs: {
-      bedrooms: row.features?.bedrooms ?? row.bedrooms ?? null,
-      bathrooms: row.features?.bathrooms ?? row.bathrooms ?? null,
-      area: row.features?.sqft ?? row.features?.area ?? row.area ?? null,
-    },
-    features: Array.isArray(row.amenities) ? row.amenities : [],
+    specs: row.specs ?? {},
+    features: Array.isArray(row.features) ? row.features : [],
     isFeatured: Boolean(row.is_featured ?? row.isFeatured ?? false),
   })) as Property[];
 }
