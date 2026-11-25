@@ -3,54 +3,38 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { createServer } from "http";
 
-const app = express();
+export const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Railway / production compatible PORT
 const PORT = Number(process.env.PORT || 5000);
+export const server = createServer(app);
 
-// 1. OPEN PORT IMMEDIATELY
-// This ensures Replit's health check passes instantly regardless of initialization.
-const server = createServer(app);
+// Preserve local/Replit behavior; Vercel functions must not open their own listener.
+if (!process.env.VERCEL) {
+  server.listen(PORT, "0.0.0.0", () => {
+    log(`Health check ready: serving on port ${PORT}`);
+  });
+}
 
-server.listen(PORT, "0.0.0.0", () => {
-  log(`Health check ready: serving on port ${PORT}`);
-});
-
-// Minimal request logging
 app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
   res.on("finish", () => {
     const duration = Date.now() - start;
-    if (req.path.startsWith("/api")) {
-      log(`${req.method} ${req.path} ${res.statusCode} in ${duration}ms`);
-    }
+    if (req.path.startsWith("/api")) log(`${req.method} ${req.path} ${res.statusCode} in ${duration}ms`);
   });
   next();
 });
 
-// 2. BACKGROUND INITIALIZATION
-(async () => {
-  try {
-    // Register all API and Auth routes
-    await registerRoutes(app);
-
-    // Global error handler
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      res.status(status).json({ message: err.message || "Internal Server Error" });
-    });
-
-    // Finalize setup based on environment
-    if (app.get("env") === "development") {
-      await setupVite(server, app);
-    } else {
-      serveStatic(app);
-    }
-    
-    log("App initialized.");
-  } catch (e: any) {
-    log(`Initialization Error: ${e.message}`);
-  }
+export const appReady = (async () => {
+  await registerRoutes(app);
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    res.status(status).json({ message: err.message || "Internal Server Error" });
+  });
+  if (app.get("env") === "development") await setupVite(server, app);
+  else serveStatic(app);
+  log("App initialized.");
 })();
+
+export default app;
