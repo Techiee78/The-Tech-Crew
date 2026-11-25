@@ -1,7 +1,19 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
+
+function requireAdmin(req: Request, res: Response): boolean {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ message: "Unauthorized" });
+    return false;
+  }
+  if (!(req.user as any)?.isAdmin) {
+    res.status(403).json({ message: "Forbidden" });
+    return false;
+  }
+  return true;
+}
 
 export async function registerRoutes(app: Express): Promise<void> {
   // Setup Auth (Passport session)
@@ -25,21 +37,21 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   app.post(api.properties.create.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (!requireAdmin(req, res)) return;
     const input = api.properties.create.input.parse(req.body);
     const property = await storage.createProperty(input);
     res.status(201).json(property);
   });
 
   app.put(api.properties.update.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (!requireAdmin(req, res)) return;
     const input = api.properties.update.input.parse(req.body);
     const property = await storage.updateProperty(Number(req.params.id), input);
     res.json(property);
   });
 
   app.delete(api.properties.delete.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (!requireAdmin(req, res)) return;
     await storage.deleteProperty(Number(req.params.id));
     res.status(204).send();
   });
@@ -56,20 +68,20 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   app.post(api.cars.create.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (!requireAdmin(req, res)) return;
     const input = api.cars.create.input.parse(req.body);
     const car = await storage.createCar(input);
     res.status(201).json(car);
   });
 
   app.put("/api/cars/:id", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (!requireAdmin(req, res)) return;
     const car = await storage.updateCar(Number(req.params.id), req.body);
     res.json(car);
   });
 
   app.delete(api.cars.delete.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (!requireAdmin(req, res)) return;
     await storage.deleteCar(Number(req.params.id));
     res.status(204).send();
   });
@@ -86,7 +98,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   app.get(api.enquiries.list.path, async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    if (!requireAdmin(req, res)) return;
     const enquiries = await storage.getEnquiries();
     res.json(enquiries);
   });
@@ -98,18 +110,18 @@ export async function registerRoutes(app: Express): Promise<void> {
 import { hashPassword } from "./auth";
 
 async function seedDatabase() {
-  const existingUser = await storage.getUserByUsername("admin");
-  if (!existingUser) {
-    const hashedPassword = await hashPassword("Gamer991752@");
-    await storage.createUser({
-      username: "admin",
-      password: hashedPassword,
-      isAdmin: true
-    });
-  } else {
-    // Update password for existing admin user
-    const hashedPassword = await hashPassword("Gamer991752@");
-    await storage.updateUserPassword(existingUser.id, hashedPassword);
+  // Optional one-time bootstrap; never overwrite an existing account or password.
+  const bootstrapUsername = process.env.ADMIN_BOOTSTRAP_USERNAME?.trim();
+  const bootstrapPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD;
+  if (bootstrapUsername && bootstrapPassword && bootstrapPassword.length >= 12) {
+    const existingBootstrap = await storage.getUserByUsername(bootstrapUsername);
+    if (!existingBootstrap) {
+      await storage.createUser({
+        username: bootstrapUsername,
+        password: await hashPassword(bootstrapPassword),
+        isAdmin: true,
+      });
+    }
   }
 
   const existingProps = await storage.getProperties();
