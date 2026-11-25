@@ -23,11 +23,21 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret || sessionSecret.length < 32) {
+    throw new Error("SESSION_SECRET must be configured with at least 32 characters.");
+  }
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "r3pl1t_s3cr3t_k3y_123",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     store: storage.sessionStore,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: app.get("env") === "production",
+      maxAge: 8 * 60 * 60 * 1000,
+    },
   };
 
   if (app.get("env") === "production") {
@@ -41,55 +51,39 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       const user = await storage.getUserByUsername(username);
-      if (!user || !(await comparePasswords(password, user.password))) {
+      if (!user || !user.isAdmin || !(await comparePasswords(password, user.password))) {
         return done(null, false);
-      } else {
-        return done(null, user);
       }
+      return done(null, user);
     }),
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
+  passport.serializeUser((user, done) => done(null, (user as User).id));
   passport.deserializeUser(async (id: number, done) => {
     const user = await storage.getUser(id);
     done(null, user);
   });
 
-  app.post("/api/auth/register", async (req, res, next) => {
-    try {
-      const existingUser = await storage.getUserByUsername(req.body.username);
-      if (existingUser) {
-        return res.status(400).send("Username already exists");
-      }
-
-      const hashedPassword = await hashPassword(req.body.password);
-      const user = await storage.createUser({
-        ...req.body,
-        password: hashedPassword,
-      });
-
-      req.login(user, (err) => {
-        if (err) return next(err);
-        res.status(201).json(user);
-      });
-    } catch (err) {
-      next(err);
-    }
-  });
-
+  // Public registration intentionally disabled. Admin accounts can only be provisioned server-side.
   app.post("/api/auth/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+    const user = req.user as User;
+    res.status(200).json({ id: user.id, username: user.username, isAdmin: user.isAdmin });
   });
 
   app.post("/api/auth/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
-      res.sendStatus(200);
+      req.session.destroy((sessionErr) => {
+        if (sessionErr) return next(sessionErr);
+        res.clearCookie("connect.sid");
+        res.sendStatus(200);
+      });
     });
   });
 
   app.get("/api/auth/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+    const user = req.user as User;
+    res.json({ id: user.id, username: user.username, isAdmin: user.isAdmin });
   });
 }

@@ -8,7 +8,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Railway / production compatible PORT
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT || 5000);
 
 // 1. OPEN PORT IMMEDIATELY
 // This ensures Replit's health check passes instantly regardless of initialization.

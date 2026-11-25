@@ -7,7 +7,7 @@ import { Link } from "wouter";
 
 export default function PropertyDetails() {
   const params = useParams<{ id: string }>();
-  const id = parseInt(params.id);
+  const id = params.id;
   const { data: property, isLoading } = useProperty(id);
 
   if (isLoading) {
