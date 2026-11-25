@@ -7,7 +7,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 async function getSupabaseCars(): Promise<Car[]> {
   if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error("Supabase public API config missing");
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/cars?select=*&order=created_at.desc`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/cars?select=*&order=id.desc`, {
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
   });
   if (!res.ok) throw new Error(`Supabase cars fetch failed (${res.status})`);
