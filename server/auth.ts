@@ -16,10 +16,17 @@ export async function hashPassword(password: string) {
 }
 
 async function comparePasswords(supplied: string, stored: string) {
+  // Hashed passwords use the "hash.salt" format. Legacy admin records
+  // may still contain plain text; verify them safely and upgrade on login.
+  if (!stored.includes(".")) {
+    const suppliedBuf = Buffer.from(supplied);
+    const storedBuf = Buffer.from(stored);
+    return suppliedBuf.length === storedBuf.length && timingSafeEqual(suppliedBuf, storedBuf);
+  }
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  return hashedBuf.length === suppliedBuf.length && timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
 export function setupAuth(app: Express) {
@@ -50,11 +57,19 @@ export function setupAuth(app: Express) {
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
-      const user = await storage.getUserByUsername(username);
-      if (!user || !user.isAdmin || !(await comparePasswords(password, user.password))) {
-        return done(null, false);
+      try {
+        const user = await storage.getUserByUsername(username);
+        if (!user || !user.isAdmin || !(await comparePasswords(password, user.password))) {
+          return done(null, false);
+        }
+        // Automatically migrate a verified legacy plain-text password to scrypt.
+        if (!user.password.includes(".")) {
+          await storage.updateUserPassword(user.id, await hashPassword(password));
+        }
+        return done(null, user);
+      } catch (error) {
+        return done(error as Error);
       }
-      return done(null, user);
     }),
   );
 
