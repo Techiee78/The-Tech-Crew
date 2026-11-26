@@ -32,8 +32,11 @@ export const appReady = (async () => {
     const status = err.status || err.statusCode || 500;
     res.status(status).json({ message: err.message || "Internal Server Error" });
   });
-  if (app.get("env") === "development") await setupVite(server, app);
-  else serveStatic(app);
+  // Vercel serves the Vite build as static output; the function only handles API requests.
+  if (!process.env.VERCEL) {
+    if (app.get("env") === "development") await setupVite(server, app);
+    else serveStatic(app);
+  }
   log("App initialized.");
 })();
 
