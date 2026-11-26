@@ -1,0 +1,13 @@
+import app, { appReady } from "../server/index";
+
+export default async function handler(req: any, res: any) {
+  try {
+    await appReady;
+    return app(req, res);
+  } catch (error) {
+    console.error("API initialization failed", error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: "API initialization failed" });
+    }
+  }
+}
