@@ -6,6 +6,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User } from "@shared/schema";
+import { api } from "@shared/routes";
 
 const scryptAsync = promisify(scrypt);
 
@@ -96,7 +97,7 @@ export function setupAuth(app: Express) {
     });
   });
 
-  app.get("/api/auth/user", (req, res) => {
+  app.get(api.auth.me.path, (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = req.user as User;
     res.json({ id: user.id, username: user.username, isAdmin: user.isAdmin });
