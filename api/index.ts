@@ -1,4 +1,4 @@
-import app, { appReady } from "../server/index";
+import app, { appReady } from "../dist/index.js";
 
 export default async function handler(req: any, res: any) {
   await appReady;
