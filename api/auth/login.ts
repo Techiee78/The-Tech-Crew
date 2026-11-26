@@ -1,0 +1,6 @@
+// Explicit Vercel route for admin login.
+import app, { appReady } from "../../dist/vercel.js";
+export default async function handler(req: any, res: any) {
+  try { await appReady; return app(req, res); }
+  catch (error) { console.error("Auth API initialization failed", error); if (!res.headersSent) res.status(500).json({ message: "API initialization failed" }); }
+}
