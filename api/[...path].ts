@@ -1,4 +1,4 @@
-import app, { appReady } from "../dist/index.js";
+import app, { appReady } from "../dist/vercel.js";
 
 export default async function handler(req: any, res: any) {
   try {
