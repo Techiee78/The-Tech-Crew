@@ -3,36 +3,18 @@ import { api, buildUrl } from "@shared/routes";
 import type { Property, InsertProperty } from "@shared/schema";
 
 type PropertyFilter = { type?: "buy" | "rent" | "both"; minPrice?: string; maxPrice?: string };
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-async function getSupabaseProperties(): Promise<Property[]> {
-  if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error("Supabase public API config missing");
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/properties?select=*&order=id.desc`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-  });
-  if (!res.ok) throw new Error(`Supabase properties fetch failed (${res.status})`);
-  const rows = await res.json();
-  return rows.map((row: any) => ({
-    id: row.id,
-    title: row.title ?? "",
-    description: row.description ?? "",
-    type: String(row.type ?? "").toLowerCase(),
-    location: row.location ?? "",
-    price: row.price == null ? null : Number(row.price),
-    imageUrl: row.image_url ?? row.images?.[0] ?? "",
-    images: Array.isArray(row.images) ? row.images : [],
-    specs: row.specs ?? {},
-    features: Array.isArray(row.features) ? row.features : [],
-    isFeatured: Boolean(row.is_featured ?? row.isFeatured ?? false),
-  })) as Property[];
+async function getProperties(): Promise<Property[]> {
+  const res = await fetch(api.properties.list.path, { credentials: "include" });
+  if (!res.ok) throw new Error(`Properties API failed (${res.status})`);
+  return await res.json();
 }
 
 export function useProperties(filters?: PropertyFilter) {
   return useQuery({
-    queryKey: [api.properties.list.path, "supabase", filters],
+    queryKey: [api.properties.list.path, filters],
     queryFn: async () => {
-      let list = await getSupabaseProperties();
+      let list = await getProperties();
       if (filters?.type && filters.type !== "both") list = list.filter(p => String(p.type).toLowerCase() === filters.type);
       if (filters?.minPrice) list = list.filter(p => p.price != null && p.price >= Number(filters.minPrice));
       if (filters?.maxPrice) list = list.filter(p => p.price != null && p.price <= Number(filters.maxPrice));
@@ -43,8 +25,8 @@ export function useProperties(filters?: PropertyFilter) {
 
 export function useProperty(id: string | number) {
   return useQuery({
-    queryKey: [api.properties.get.path, "supabase", id],
-    queryFn: async () => (await getSupabaseProperties()).find(p => String(p.id) === String(id)) ?? null,
+    queryKey: [api.properties.get.path, id],
+    queryFn: async () => (await getProperties()).find(p => String(p.id) === String(id)) ?? null,
     enabled: Boolean(id),
   });
 }
