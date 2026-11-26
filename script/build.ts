@@ -62,6 +62,25 @@ async function buildAll() {
       js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
     },
   });
+
+  // Build a Vercel API-only server bundle without importing Vite/Rollup.
+  await esbuild({
+    entryPoints: ["server/vercel.ts"],
+    platform: "node",
+    bundle: true,
+    format: "esm",
+    outfile: "dist/vercel.js",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+    minify: true,
+    external: externals,
+    logLevel: "info",
+    banner: {
+      js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
+    },
+  });
+
 }
 
 buildAll().catch((err) => {
